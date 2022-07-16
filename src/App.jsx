@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import './App.css'
 import { CeramicClient } from '@ceramicnetwork/http-client'
-import { getResolver } from '@ceramicnetwork/3id-did-resolver'
 import { EthereumAuthProvider, ThreeIdConnect } from '@3id/connect'
 import { DID } from 'dids'
 import { IDX } from '@ceramicstudio/idx'
-// import { FunctionFragment } from 'ethers/lib/utils'
+import { ethers } from 'ethers'
+import Web3Modal from 'web3modal';
+import { getResolver } from '@ceramicnetwork/3id-did-resolver'
 
 const endpoint = "https://ceramic-clay.3boxlabs.com"
 function App() {
@@ -15,57 +16,74 @@ function App() {
   const [loaded, setLoaded] = useState(false)
 
   async function connect() {
-    const addresses = await window.ethereum.request({
-      method: 'eth_requestAccounts'
-    })
-    return addresses
+    const web3modal = new Web3Modal()
+    const connection = await web3modal.connect()
+    const provider = new ethers.providers.Web3Provider(connection)
+    const signer = provider.getSigner()
+    const address = await signer.getAddress()
+    return address
   }
 
   async function readProfile() {
-    const [address] = await connect()
-    const ceramic = new CeramicClient(endpoint)
-    const idx = new IDX({ceramic})
+    if (typeof window.ethereum !== 'undefined') {
+      const address = await connect()
+      const ceramic = new CeramicClient(endpoint)
+      const idx = new IDX({ceramic})
 
-    try {
-      const data = await idx.get(
-        'basicProfile',
-        `${address}@eip155:1`
-      )
-      console.log('data: ', data);
-      if (data.name) setName(data.name)
-      if (data.avatar) setImage(data.avatar)
-    } catch(err) {
-      console.log(err)
-      setLoaded(true)
+      if (typeof address !== 'undefined') {
+        console.log(`reading: ${address}`)
+
+        try {
+          const data = await idx.get(
+            'basicProfile',
+            `${address}@eip155:1`
+          )
+          console.log(`data: ${data}`)
+          if (data.name) setName(data.name)
+          if (data.avatar) setImage(data.avatar)
+        } catch(error) {
+          console.log(error)
+          setLoaded(true)
+        }
+      } else {
+        window.alert('Please connect to your wallet')
+      }
+    } else {
+      window.alert('Please connect to your wallet')
     }
   }
 
 
   async function updateProfile() {
-    const [address] = await connect()
-    const ceramic = new CeramicClient(endpoint)
+    if (typeof window.ethereum !== 'undefined') {
+      const address = await connect()
 
-    const threeIdConnect = new ThreeIdConnect()
-    const provider = new EthereumAuthProvider(window.ethereum, address)
-  
-    await threeIdConnect.connect(provider)
-
-    const did = new DID({
-      provider: threeIdConnect.getDidProvider(),
-      resolver: getResolver()
-    })
-
-    ceramic.setDID(did)
-    await ceramic.did.authenticate();
-
-    const idx = new IDX({ceramic})
-
-    await idx.set('basicProfile', {
-      name,
-      avatar: image
-    })
+      const ceramic = new CeramicClient(endpoint)
+      const threeIdConnect = new ThreeIdConnect()
       
-    console.log("profile updated")
+      if (typeof address !== 'undefined') {
+        const provider = new EthereumAuthProvider(window.ethereum, address)
+        await threeIdConnect.connect(provider)
+        const did = new DID({
+          provider: threeIdConnect.getDidProvider(),
+          resolver: {...getResolver(ceramic) }
+        })
+        ceramic.setDID(did)
+        await ceramic.did.authenticate();
+    
+        const idx = new IDX({ceramic})
+    
+        await idx.set('basicProfile', {
+          name,
+          avatar: image
+        })
+        console.log("profile updated")
+      } else {
+        window.alert('Please connect to your wallet')
+      }
+    } else {
+      window.alert('Please connect to your wallet')
+    }
   }
 
   return (
