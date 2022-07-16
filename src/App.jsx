@@ -6,7 +6,7 @@ import { DID } from 'dids'
 import { IDX } from '@ceramicstudio/idx'
 import { ethers } from 'ethers'
 import Web3Modal from 'web3modal';
-import { getResolver } from '@ceramicnetwork/3id-did-resolver'
+import ThreeIdResolver from '@ceramicnetwork/3id-did-resolver';
 
 const endpoint = "https://ceramic-clay.3boxlabs.com"
 function App() {
@@ -66,7 +66,7 @@ function App() {
         await threeIdConnect.connect(provider)
         const did = new DID({
           provider: threeIdConnect.getDidProvider(),
-          resolver: {...getResolver(ceramic) }
+          resolver: {...ThreeIdResolver.getResolver(ceramic) }
         })
         ceramic.setDID(did)
         await ceramic.did.authenticate();
